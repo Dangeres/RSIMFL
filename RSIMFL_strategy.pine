@@ -1,0 +1,93 @@
+//@version=5
+strategy(title="RSIMFL Liner ST", shorttitle="RSIMFL ST")
+
+// Inputs from user
+RSI_low = input.int(title="RSI low", defval=30)
+RSI_upp = input.int(title="RSI up", defval=70)
+
+MFL_low = input.int(title="MFL low", defval=35)
+MFL_upp = input.int(title="MFL up", defval=75)
+
+TSI_low = input.int(title="TSI low", defval=0)
+TSI_upp = input.int(title="TSI up", defval=80)
+
+length = input.int(title="Length", defval=14, minval=1, maxval=2000)
+sma = input.int(title="SMA moving", defval=13, options = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946])
+
+
+// RSI
+rsiGroup = 'RSI'
+src = input(title='Source', defval=close, group=rsiGroup)
+
+RSI = ta.rsi(src, length)
+
+RSI := if sma > 0
+    ta.sma(RSI, sma)
+else
+    RSI
+
+plot(RSI, style=plot.style_line, linewidth=1, color=color.yellow, title = 'RSI')
+
+
+// Money Flow
+src2 = hlc3
+mf = ta.mfi(src2, length)
+
+mf := if sma > 0
+    ta.sma(mf, sma)
+else
+    mf
+ 
+plot(mf, "MoneyFlow", color=#7E57C2)
+
+
+// TSI
+
+long = input(title="Long Length", defval=25)
+short = input(title="Short Length", defval=13)
+signal = input(title="Signal Length", defval=13)
+
+price = close
+double_smooth(src, long, short) =>
+	fist_smooth = ta.ema(src, long)
+	ta.ema(fist_smooth, short)
+pc = ta.change(price)
+double_smoothed_pc = double_smooth(pc, long, short)
+double_smoothed_abs_pc = double_smooth(math.abs(pc), long, short)
+tsi_value = 100 * (double_smoothed_pc / double_smoothed_abs_pc) + 40
+
+tsi_value := if sma > 0
+    ta.sma(tsi_value, sma)
+else
+    tsi_value
+
+plot(tsi_value, "TSI", color=color.blue)
+
+
+overbought_mfl=hline(MFL_upp, title="Overbought MFI", color=#7E57C2)
+oversold_mfl=hline(MFL_low, title="Oversold MFI", color=#7E57C2)
+
+overbought_rsi=hline(RSI_upp, title="Overbought RSI", color=color.new(color.yellow, 50))
+oversold_rsi=hline(RSI_low, title="Oversold RSI", color=color.new(color.yellow, 50))
+
+overbought_tsi=hline(TSI_upp, title="Overbought RSI", color=color.new(color.blue, 50))
+oversold_tsi=hline(TSI_low, title="Oversold RSI", color=color.new(color.blue, 50))
+
+fill(overbought_mfl, oversold_mfl, color=color.rgb(126, 87, 194, 90), title="Background")
+fill(overbought_rsi, oversold_rsi, color=color.rgb(126, 87, 194, 90), title="Background")
+fill(overbought_tsi, oversold_tsi, color=color.rgb(126, 87, 194, 90), title="Background")
+
+long_cond = RSI < RSI_low and mf < MFL_low and tsi_value < TSI_low
+short_cond = RSI > RSI_upp and mf > MFL_upp and tsi_value > TSI_upp
+
+if (long_cond)
+    strategy.entry(id = "My Long Entry Id", direction = strategy.long, limit = close,  stop = close - close / 100 * 2)
+    
+// plot(close - close / 100, "stop", color=color.red, display = long_cond ? display.all : display.none)
+
+if (short_cond)
+    strategy.entry(id = "My Short Entry Id", direction = strategy.short, limit = close, stop = close + close / 100 * 2)
+    
+// plot(close + close / 100, "stop", color=color.red, display = short_cond ? display.all: display.none)
+
+bgcolor(long_cond ? color.new(color.green, 0) : short_cond ? color.new(color.red, 0) : na)
